@@ -1,0 +1,54 @@
+#!/bin/zsh
+if [[ $# < 1 ]]; then
+    print "Rename files by their OSX content creation date. Usage: ${0:t} target"
+else
+
+    for file do
+        # Get the full path to the file, minus the filename, and save it for
+        # later use
+        pathhead=${file:h}/
+
+        # Explicitly set $file equal to pathhead plus the tail of the file. This
+        # is done to handle cases where the script is run on files in the current
+        # directory and the "./" portion of the path is stripped off the
+        # argument. This will cause filenames to be subscripted unnecessarily.
+        file=$pathhead${file:t:l}
+
+
+        # Get content creation date and time.
+        ccinfo=(${=$(mdls -name kMDItemContentCreationDate $file)})
+
+        # Create the root filename. Remove the dashes from the date and replace
+        # the colons in the time with hyphens using the zsh //l/r search and
+        # replace modifier.
+        root=$pathhead${ccinfo[3]//"-"/""}"_"${ccinfo[4]//":"/"-"}
+
+        # Check if the new filename already exists or if our file is already
+        # properly named
+        if [[ (-a $root"."$file:e) &&
+            ($file != $root"."$file:e) ]]; then
+
+            # If the new filename is already being used, add a number to the end
+            # of the root name.
+            typeset -i subscript=1
+            while [[ (-a $root"_"$subscript"."$file:e)]]; do
+
+                # If the file is already named as the root filename with
+                # subscript we're done so exit
+                if [[ $file == $root"_"$subscript"."$file:e ]]; then
+                    break
+                fi
+
+                # Incriment the subscript to create the next filename to check
+                (( subscript++ ))
+            done
+            root+="_"$subscript
+        fi
+
+        #Create the new file path.
+        newpathname=$root"."$file:e
+
+        #Move the original file to the new filename.
+        mv $file $newpathname
+    done
+fi

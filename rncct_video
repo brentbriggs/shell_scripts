@@ -1,0 +1,13 @@
+#!/bin/zsh
+if [[ $# < 1 ]]; then
+    print "Rename video files by their content creation date. Only files with"
+    print "extensions mov, mp4, m4v, and avi will be changed."
+    print "Usage: ${0:t} target"
+else
+    for file do
+        if [[ ${file:l:e} == (mov|mp4|m4v|avi) ]]; then
+            /Users/brent/bin/rncct $file
+            syslog -s -l 2 "rncct_video running on file $file"
+        fi
+    done
+fi
