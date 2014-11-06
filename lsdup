@@ -1,0 +1,55 @@
+#!/bin/zsh
+#Output a list of all executables that appear in your $PATH more than once.
+
+#Determine what options are set.
+local opt
+local verbose=0
+while getopts v opt
+do
+    case $opt in
+        (v)
+            verbose=1
+            ;;
+        (\?)
+            print  "Invalid option. Usage: lsdp [-v]"
+            return 1
+            ;;
+    esac
+done
+
+typeset -a programs
+for entry in $path
+do
+    if [[ -d $entry ]] then
+        programs+=($entry/*(:t))
+    fi
+done
+programs=(${(o)programs})
+
+# Find the duplicates
+typeset -i counter
+for (( counter=1; $counter <= ${#programs}; counter++ ))
+do
+    if [[ $programs[counter] == $programs[counter+1] ]] then
+        while [[ $programs[counter] == $programs[counter+1] ]]
+        do
+            programs[counter+1]=()
+        done
+    else
+        programs[counter]=()
+        (( counter-- ))
+    fi
+done
+
+if [[ $verbose -eq 1 ]] then
+    for p in $programs
+    do
+        print -l $p:
+        print -l "=========="
+        print -l $(which -a ${p})
+        print -l
+    done
+else
+    print -c $programs
+fi
+
