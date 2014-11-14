@@ -7,7 +7,6 @@ else
     for file do
         if [[ ${file:l:e} == (mov|mp4|m4v|avi) ]]; then
             /Users/brent/bin/rncct $file
-            syslog -s -l 2 "rncct_video running on file $file"
         fi
     done
 fi

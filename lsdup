@@ -11,7 +11,7 @@ do
             verbose=1
             ;;
         (\?)
-            print  "Invalid option. Usage: lsdp [-v]"
+            print  "Invalid option. Usage: ${0:t} [-v]"
             return 1
             ;;
     esac

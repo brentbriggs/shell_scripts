@@ -1,11 +1,12 @@
 #!/bin/zsh
 if [[ $# < 1 ]]; then
-    print "Search the path for pattern matches. Usage: fip <pattern>"
+    print "Search the path for pattern matches. Usage: ${0:t} <pattern>"
 else
     #Search the path for occurances of each argument.
     typeset pattern
     for i do
-        pattern=$i(N)
+        pattern=$i(N) #N glob qualifier expands whole pattern to empty if there
+                      #no match.
         print -l -- ${^path}/${~pattern}
     done
 fi

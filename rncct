@@ -12,7 +12,7 @@ else
         # is done to handle cases where the script is run on files in the current
         # directory and the "./" portion of the path is stripped off the
         # argument. This will cause filenames to be subscripted unnecessarily.
-        file=$pathhead${file:t:l}
+        file=$pathhead${file:t:r}"."${file:e:l}
 
 
         # Get content creation date and time.
@@ -21,7 +21,7 @@ else
         # Create the root filename. Remove the dashes from the date and replace
         # the colons in the time with hyphens using the zsh //l/r search and
         # replace modifier.
-        root=$pathhead${ccinfo[3]//"-"/""}"_"${ccinfo[4]//":"/"-"}
+        root=$pathhead${ccinfo[3]//"-"/""}"_"${ccinfo[4]//":"/"-"}"Z"
 
         # Check if the new filename already exists or if our file is already
         # properly named
