@@ -5,8 +5,8 @@ else
     #Search the path for occurances of each argument.
     typeset pattern
     for i do
-        pattern=$i(N) #N glob qualifier expands whole pattern to empty if there
-                      #no match.
+        pattern=$i(N) # N glob qualifier expands whole pattern to empty if there
+                      # is no match.
         print -l -- ${^path}/${~pattern}
     done
 fi
