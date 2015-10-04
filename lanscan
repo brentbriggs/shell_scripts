@@ -1,0 +1,177 @@
+#! /bin/zsh
+# Scan network interfaces and if active, print the connecton specifications.
+# Also provides the option to scan the local subnet for other connected devices.
+# This script runs under zsh on OS X only.
+# Dependencies:
+# airport (OS X)
+# awk
+# curl
+# ipconfig
+# networksetup
+# nmap
+# sed
+# wget
+print_usage() {
+    print "USAGE: lanscan [-h | --help] | [[-o | --other ] [-s | --speed]] [interface ...]"
+};
+
+print_help() {
+    print "Scans ethernet interfaces to determine which are active. If active";
+    print "interfaces are found then information is output for those";
+    print "interfaces.\n";
+
+    print "If valid ethernet interface names are suppled as arguments then";
+    print "those interfaces are scanned. If no arguments are supplied then ";
+    print "all available ethernet interfaces are scanned.\n"
+
+
+    print "The following options are available:";
+    print -f "-h:\t\tPrints usage instructions\n";
+    print -f "--help:\t\tPrints this detailed description\n";
+    print "[-o | --other]:\tScans the interface for other hosts and prints";
+    print "\t\tthe IP address and hostname information if found."
+    print "[-s | --speed]: Uses wget to perform a connectivity speed test.";
+};
+
+# Set local variables.
+HOSTSCAN=false;
+SPEEDTEST=false;
+
+# Process command line arguments. #
+# Strip out the valid options and store them with zparseopts
+zparseopts -D -M h=h_opt -help=help_opt o=o_opt -other=o s=s_opt -speed=s;
+
+if [ $h_opt[1] ]; then
+    print_usage;
+    exit;
+fi;
+
+if [ $help_opt[1] ]; then
+    print_usage;
+    print "";
+    print_help;
+    exit;
+fi;
+
+if [ $o_opt[1] ]; then
+    HOSTSCAN=true;
+fi;
+
+if [ $s_opt[1] ]; then
+    SPEEDTEST=true;
+fi;
+
+# Produce an error if invalid options are encountered
+for arg in $@; do
+    if [[ $arg =~ -.* ]]; then
+        print -R "Bad option $arg";
+        print_usage;
+        exit;
+    fi;
+done;
+
+# Output environment information on each interface #
+# Get a list of available interfaces on this machine
+AVAILABLE_ETHERNET_INTERFACES=("${(@f)$(networksetup -listallhardwareports |
+                                grep -Eo 'en[0-9]' | sort)}");
+# Determine which interfaces to scan
+INTERFACES_TO_SCAN=();
+
+if [[ $# > 0 ]]; then # There are arguments
+    for arg in $@; do
+        if [[ ${AVAILABLE_ETHERNET_INTERFACES[(r)$arg]} == $arg ]]; then
+            INTERFACES_TO_SCAN+=$arg;
+        else
+            print -R "$arg is not a valid interface on this machine.";
+            print "Valid interfaces are: $AVAILABLE_ETHERNET_INTERFACES";
+        fi;
+    done;
+else # There are no arguments so scan all interfaces
+    INTERFACES_TO_SCAN=($AVAILABLE_ETHERNET_INTERFACES);
+fi
+
+for INTERFACE in $INTERFACES_TO_SCAN; do
+    NET_ENV="$(ipconfig getpacket $INTERFACE)";
+
+    if [ $NET_ENV ]; then
+        print "";
+        print "$INTERFACE ++  Active  ++";
+        print -R "------------------";
+        # Get my LAN IP Address
+        # Check if static ip or dhcp
+        STATIC_IP="$(echo $NET_ENV | grep "ciaddr" | awk '{print $3}')";
+        DHCP_IP="$(echo $NET_ENV | grep "yiaddr" | awk '{print $3}')";
+        if [ $STATIC_IP != "0.0.0.0" ]; then
+            print -f "LAN IP:\t\t%s(static)\n" $STATIC_IP;
+            MY_IP="$(echo $STATIC_IP)";
+        else
+            print -f "LAN IP:\t\t%s (DHCP)\n" $DHCP_IP;
+            MY_IP="$(echo $DHCP_IP)";
+        fi;
+
+        # Get my MAC Address for this interface.
+        MAC_ADDRESS="$(echo $NET_ENV | grep "chaddr" | awk '{print $3}')";
+        print -f "MAC Address:\t%s\n" $MAC_ADDRESS;
+
+        # Get the router IP Address
+        ROUTER_IP="$(echo $NET_ENV | grep "siaddr" | awk '{print $3}')";
+        print -f "Router IP:\t%s\n" $ROUTER_IP;
+
+        # Display WiFi Settings if the active interface is wireless
+        if [ $INTERFACE=="en1" ]; then
+            # Get Wifi SSID
+            SSID="$(/System/Library/PrivateFrameworks/Apple80211.framework/Versions/A/Resources/airport -I | grep -E '^\s*SSID:' | awk '{print $2}')";
+            print -f "WLAN Name:\t%s\n" $SSID;
+
+            # Get the Wireless base station ID
+            BSSID="$(/System/Library/PrivateFrameworks/Apple80211.framework/Versions/A/Resources/airport -I | grep BSSID | grep -Eo '([0-9a-zA-Z]{1,2}:){5}[0-9a-zA-Z]{1,2}' )";
+            print -f "WLAN MAC ID:\t%s\n" $BSSID;
+        fi;
+
+        # Get the DNS Server(s)
+        DNS_SERVER=("${(@f)$(echo $NET_ENV | grep "domain_name_server" | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}')}a");
+        print -f "DNS Server(s):\t%s\n" $DNS_SERVER[1];
+        shift DNS_SERVER;
+        for DNS in $DNS_SERVER; do
+            print -f "\t\t%s\n" $DNS;
+        done;
+
+        # Get the router's public IP Address
+        ROUTER_PUBLIC_IP="$(curl -s http://checkip.dyndns.org | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}')";
+        print -f "Public IP:\t%s\n" $ROUTER_PUBLIC_IP;
+
+        if [[ $HOSTSCAN == true ]]; then
+            # Get the subnet for this interface and use it to scan the network for hosts
+            SUBNET="$(echo $ROUTER_IP | sed -E "s/^(([0-9]{1,3}\.){3})([0-9]{1,3})/\1*/")";
+            DISCOVERED_HOSTS=("${(@f)$(nmap -sP -T4 $SUBNET | grep -E '([0-9]{1,3}\.){3}[0-9]{1,3}')}");
+
+            # Display discovered host information
+            print "";
+            print -f "     Discovered Hosts (%s)\n" $INTERFACE;
+            print "\--------------------------------";
+            for HOST in $DISCOVERED_HOSTS; do
+
+                set HOST_IP = "";
+                set HOSTNAME ="";
+                if [[ "$(echo $HOST | awk '{print NF}')" == 6 ]]; then
+                    # 6 Fields in the results means that the hostname
+                    # information is present.
+                    HOSTNAME="$(echo $HOST | awk '{print $5}')";
+                fi;
+
+                # Extract the host IP Address
+                HOST_IP="$(echo $HOST | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}')";
+
+                if [[ ($HOST_IP != $MY_IP) && ($HOST_IP != $ROUTER_IP) ]]; then
+                    print -f "%-16s%s\t%s\n" $HOST_IP $HOSTNAME;
+                fi;
+            done;
+        fi;
+        print "";
+        if [[ $SPEEDTEST == true ]]; then
+            wget -O /dev/null http://speedtest.wdc01.softlayer.com/downloads/test100.zip
+        fi;
+    else
+        print "$INTERFACE -- Inactive -- "
+    fi;
+done
