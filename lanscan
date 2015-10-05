@@ -1,9 +1,10 @@
-#! /bin/zsh
+#!/bin/zsh
 # Scan network interfaces and if active, print the connecton specifications.
 # Also provides the option to scan the local subnet for other connected devices.
 # This script runs under zsh on OS X only.
+#
 # Dependencies:
-# airport (OS X)
+# airport (OS X command line tool)
 # awk
 # curl
 # ipconfig
@@ -11,6 +12,7 @@
 # nmap
 # sed
 # wget
+#
 print_usage() {
     print "USAGE: lanscan [-h | --help] | [[-o | --other ] [-s | --speed]] [interface ...]"
 };
